@@ -182,7 +182,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 2
+  orthographic size: 2.1
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.25, y: 0.3, z: -10}
+  m_LocalPosition: {x: 1.0600756, y: 1.0510464, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -619,22 +619,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   width: 64
   height: 64
-  siderealOffset: 16800000
-  precessionalOffset: 16800000
-  density: 0.01
-  particleSize: 1
-  iterations: 5
-  damping: 0.0862
+  massScale: 20
+  temperatureScale: 1
+  spiralTightness: 38.8
+  density: 0.846
+  particleSize: 0.87
+  iterations: 1
+  damping: 0.0943
   layers:
-  - baseSemiMajorAxis: 1.67
-    baseEccentricity: 0.9
-    precessionalSpeed: 10000
+  - baseSemiMajorAxis: 1
+    baseEccentricity: 1.0107
+    precessionalSpeed: 10000000
     siderealSpeed: 0
     iterations: 1
   computeShader: {fileID: 7200000, guid: 7e6bf500161f4d559c1e10d0a6f53e7e, type: 3}
   particleMaterial: {fileID: 2100000, guid: 7455a7f18929e1547ba964890d705559, type: 2}
   particleMesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
-  pauseSimulation: 0
+  pauseSimulation: 1
 --- !u!4 &1507005783
 Transform:
   m_ObjectHideFlags: 0

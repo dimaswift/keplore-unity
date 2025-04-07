@@ -1,5 +1,6 @@
 using ConsequenceCascade.Graphics;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ConsequenceCascade.Behaviours
 {
@@ -8,9 +9,10 @@ namespace ConsequenceCascade.Behaviours
         [Header("Field Configuration")]  
         public int width = 256;  
         public int height = 256;
-        public float siderealOffset = 0;
-        public float precessionalOffset = 0;
-        [Range(0.0f, 0.01f)] public float density = 1f;
+        public float massScale = 0;
+        public float temperatureScale = 0;
+        public float spiralTightness = 1.0f;
+        [Range(0.0f, 1f)] public float density = 1f;
         public float particleSize = 1;
         public int iterations = 1;
         [Range(0.0f, 0.1f)] public float damping = 0.1f;
@@ -45,6 +47,8 @@ namespace ConsequenceCascade.Behaviours
             public float siderealTime;
             public float precessionalTime;
             public float mass;
+            public float temperature;
+            public float balance;
         }  
         
         [System.Serializable]
@@ -179,8 +183,9 @@ namespace ConsequenceCascade.Behaviours
             computeShader.SetFloat("iterations", layers[layerIndex].iterations);
             computeShader.SetFloat("density", density);
             computeShader.SetFloat("damping", damping);
-            computeShader.SetFloat("siderealOffset", siderealOffset);
-            computeShader.SetFloat("precessionalOffset", precessionalOffset);
+            computeShader.SetFloat("temperatureScale", temperatureScale);
+            computeShader.SetFloat("massScale", massScale);
+            computeShader.SetFloat("spiralTightness", spiralTightness);
         }  
         
         public void ResetAllFields()  
