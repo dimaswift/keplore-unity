@@ -12,6 +12,10 @@ namespace ConsequenceCascade.Behaviours
         public float massScale = 0;
         public float temperatureScale = 0;
         public float spiralTightness = 1.0f;
+        public float precessionOffset = 1.0f;
+        public float acceleration = 100;
+        public float flipFrequency = 10;
+        public float speedChangeFrequency = 1;
         [Range(0.0f, 1f)] public float density = 1f;
         public float particleSize = 1;
         public int iterations = 1;
@@ -19,6 +23,7 @@ namespace ConsequenceCascade.Behaviours
         [Header("Simulation Parameters")]
         public SimulationConfig[] layers;
 
+        public int[] speeds;
         [Header("Visualization")]  
         public ComputeShader computeShader;
 
@@ -37,9 +42,12 @@ namespace ConsequenceCascade.Behaviours
         private int threadGroupsX;  
         private int threadGroupsY;  
         private bool initialized = false;
-
-        private Camera cam;
         
+        private float nextFlip;
+        private float nextSpeedChange;
+        private Camera cam;
+        private int speedThresholdIndex;
+        private int direction = 1;
         struct FieldCell  
         {
             public Vector2 position;
@@ -105,6 +113,27 @@ namespace ConsequenceCascade.Behaviours
             {
                 pauseSimulation = !pauseSimulation;
             }
+            
+            if (Input.GetKeyDown(KeyCode.Return))
+            {
+                direction *= -1;
+                //speedThresholdIndex = speeds.Length - 1;
+            }
+
+            if (Input.GetKeyDown(KeyCode.W))
+            {
+                if (speedThresholdIndex < speeds.Length - 1)
+                {
+                    speedThresholdIndex++;
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.S))
+            {
+                if (speedThresholdIndex > 0)
+                {
+                    speedThresholdIndex--;
+                }
+            }
         }  
         
         void InitializeSimulation()  
@@ -161,6 +190,14 @@ namespace ConsequenceCascade.Behaviours
                 
                 computeShader.SetBuffer(updateKernel, "currentField", fieldBuffers[i]);
                 computeShader.Dispatch(updateKernel, threadGroupsX, threadGroupsY, 1);
+                
+                
+            }
+
+            if (Time.time > nextFlip)
+            {
+                nextFlip = Time.time + Random.Range(flipFrequency, flipFrequency * 2);
+                layers[0].precessionalSpeed *= -1;
             }
         }  
         
@@ -178,7 +215,9 @@ namespace ConsequenceCascade.Behaviours
             computeShader.SetFloat("baseEccentricity", layers[layerIndex].baseEccentricity);  
             computeShader.SetFloat("baseSemiMajorAxis", layers[layerIndex].baseSemiMajorAxis);
             computeShader.SetFloat("siderealSpeed", layers[layerIndex].siderealSpeed);
-            computeShader.SetFloat("precessionalSpeed", layers[layerIndex].precessionalSpeed);
+            //layers[layerIndex].precessionalSpeed += Time.deltaTime * acceleration;
+            computeShader.SetFloat("precessionalSpeed", speeds[speedThresholdIndex] * direction);
+            computeShader.SetFloat("precessionOffset", precessionOffset);
             computeShader.SetFloat("deltaTime", Time.deltaTime);
             computeShader.SetFloat("iterations", layers[layerIndex].iterations);
             computeShader.SetFloat("density", density);
@@ -190,8 +229,10 @@ namespace ConsequenceCascade.Behaviours
         
         public void ResetAllFields()  
         {  
-            for (int i = 0; i < layers.Length; i++)  
-            {  
+            
+            for (int i = 0; i < layers.Length; i++)
+            {
+                layers[i].precessionalSpeed = 0;
                 computeShader.SetBuffer(initializeKernel, "currentField", fieldBuffers[i]);  
                 computeShader.Dispatch(initializeKernel, threadGroupsX, threadGroupsY, 1);  
             }  

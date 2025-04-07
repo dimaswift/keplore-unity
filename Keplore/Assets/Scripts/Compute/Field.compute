@@ -34,12 +34,10 @@ float siderealSpeed;
 int iterations;
 float siderealOffset;
 float precessionalOffset;
-
 float massScale;
 float temperatureScale;
 
 RWStructuredBuffer<FieldCell> currentField;
-
 
 [numthreads(8,8,1)]  
 void InitializeField(uint3 id : SV_DispatchThreadID) {  
@@ -105,19 +103,21 @@ void UpdateField(uint3 id : SV_DispatchThreadID) {
     
     const uint index = id.y * width + id.x;  
     FieldCell cell = currentField[index];
-    const float2 gridPoint = float2(id.x, id.y);
+    const float2 gridPoint = float2(id.x, id.y) - float2((float)height * 0.5, (float)width * 0.5);
    
-    const float distanceToSun = length(float2((float)height * 0.5, (float)width * 0.5) - gridPoint);
+    const float distanceToSun = length(gridPoint);
     if(distanceToSun >= height * 0.5)
     {
+        cell.position = float2(-10000, -100000);
+        currentField[index] = cell;
         return;
     }
    // float3 orbit = calculateEllipticOrbit(baseSemiMajorAxis, cell.siderealTime, gridPoint * density, cell.precessionalTime);
     float3 orbit = float3(sin(cell.precessionalTime), cos(cell.precessionalTime), 0);
     cell.previousPosition = cell.position;
-    cell.position = gridPoint * density * 0.01 + float2(orbit.x, orbit.y);
+    cell.position = gridPoint * density * 0.1 + float2(orbit.x, orbit.y);
     //cell.siderealTime += (deltaTime * siderealSpeed / (distanceToSun)) * damping;
-    cell.precessionalTime += (deltaTime * precessionalSpeed * (distanceToSun)) * damping;
+    cell.precessionalTime += ((deltaTime * precessionalSpeed * (distanceToSun)) * damping);
     cell.mass += sin(cell.precessionalTime) / massScale;
     cell.temperature += cos(cell.precessionalTime)  / massScale;
     cell.balance += sin(cell.mass ) / massScale;

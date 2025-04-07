@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.0600756, y: 1.0510464, z: -10}
+  m_LocalPosition: {x: 0, y: 0.1, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -617,25 +617,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6dfed9984f01aac4996f251ce7f83e2c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 64
-  height: 64
-  massScale: 20
+  width: 32
+  height: 32
+  massScale: 100
   temperatureScale: 1
   spiralTightness: 38.8
-  density: 0.846
-  particleSize: 0.87
+  precessionOffset: 0
+  acceleration: 0
+  flipFrequency: 10
+  speedChangeFrequency: 1
+  density: 0.131
+  particleSize: 1.36
   iterations: 1
-  damping: 0.0943
+  damping: 0.1
   layers:
   - baseSemiMajorAxis: 1
     baseEccentricity: 1.0107
-    precessionalSpeed: 10000000
+    precessionalSpeed: -0
     siderealSpeed: 0
     iterations: 1
+  speeds: 010000000a000000e25300009bc4200014ae4701cccccc0cffffff7f
   computeShader: {fileID: 7200000, guid: 7e6bf500161f4d559c1e10d0a6f53e7e, type: 3}
   particleMaterial: {fileID: 2100000, guid: 7455a7f18929e1547ba964890d705559, type: 2}
   particleMesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
-  pauseSimulation: 1
+  pauseSimulation: 0
 --- !u!4 &1507005783
 Transform:
   m_ObjectHideFlags: 0
