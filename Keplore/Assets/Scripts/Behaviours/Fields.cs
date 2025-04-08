@@ -16,7 +16,7 @@ namespace ConsequenceCascade.Behaviours
         public float acceleration = 100;
         public float flipFrequency = 10;
         public float speedChangeFrequency = 1;
-        [Range(0.0f, 1f)] public float density = 1f;
+        [Range(-5.0f, 5f)] public float density = 1f;
         public float particleSize = 1;
         public int iterations = 1;
         [Range(0.0f, 0.1f)] public float damping = 0.1f;
@@ -63,7 +63,7 @@ namespace ConsequenceCascade.Behaviours
         public class SimulationConfig
         {
             public float baseSemiMajorAxis;
-            [Range(0.9f, 1.1f)] public float baseEccentricity;
+            [Range(0.5f, 0.9999999999f)] public float baseEccentricity;
             public float precessionalSpeed;
             public float siderealSpeed;
             public int iterations;
@@ -205,7 +205,7 @@ namespace ConsequenceCascade.Behaviours
         {
             for (int i = 0; i < layers.Length; i++)  
             {  
-                drawers[i].SetSize(particleSize);
+                drawers[i].SetSize(particleSize * cam.orthographicSize);
                 drawers[i].Draw();
             }  
         }  
@@ -213,14 +213,14 @@ namespace ConsequenceCascade.Behaviours
         void SetShaderParameters(int layerIndex)  
         {
             computeShader.SetFloat("baseEccentricity", layers[layerIndex].baseEccentricity);  
-            computeShader.SetFloat("baseSemiMajorAxis", layers[layerIndex].baseSemiMajorAxis);
+            computeShader.SetFloat("baseSemiMajorAxis", layers[layerIndex].baseSemiMajorAxis / cam.orthographicSize);
             computeShader.SetFloat("siderealSpeed", layers[layerIndex].siderealSpeed);
             //layers[layerIndex].precessionalSpeed += Time.deltaTime * acceleration;
             computeShader.SetFloat("precessionalSpeed", speeds[speedThresholdIndex] * direction);
             computeShader.SetFloat("precessionOffset", precessionOffset);
             computeShader.SetFloat("deltaTime", Time.deltaTime);
             computeShader.SetFloat("iterations", layers[layerIndex].iterations);
-            computeShader.SetFloat("density", density);
+            computeShader.SetFloat("density", density * cam.orthographicSize);
             computeShader.SetFloat("damping", damping);
             computeShader.SetFloat("temperatureScale", temperatureScale);
             computeShader.SetFloat("massScale", massScale);
