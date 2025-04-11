@@ -33,6 +33,7 @@ float precessionalSpeed;
 float siderealSpeed;
 int iterations;
 float siderealOffset;
+float extraOffset;
 float precessionalOffset;
 float massScale;
 float temperatureScale;
@@ -112,9 +113,10 @@ void UpdateField(uint3 id : SV_DispatchThreadID) {
         currentField[index] = cell;
         return;
     }
-    float3 orbit = calculateEllipticOrbit(baseSemiMajorAxis, cell.precessionalTime, gridPoint, 1);
-    cell.position = gridPoint * density * 0.1 + float2(orbit.x, orbit.y);
-    cell.precessionalTime += ((deltaTime * precessionalSpeed * (distanceToSun)) * damping);
-    cell.siderealTime += ((deltaTime * precessionalSpeed / (distanceToSun)) * damping);
+    float2 orbit = float2(sin(cell.precessionalTime), cos(cell.precessionalTime));
+    cell.position = gridPoint * 0.01 + orbit * density;
+    //cell.precessionalTime = (precessionalOffset + (distanceToSun * extraOffset + siderealOffset));
+    cell.precessionalTime = siderealOffset + (distanceToSun * extraOffset * 0.001) + precessionalOffset;
+   // cell.siderealTime += deltaTime * precessionalSpeed * damping;
     currentField[index] = cell;
 }

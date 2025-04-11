@@ -6,13 +6,20 @@ namespace ConsequenceCascade.Behaviours
 {
     public class Fields : MonoBehaviour
     {
-        [Header("Field Configuration")]  
-        public int width = 256;  
+        public bool freeze;
+        public int ticks;
+
+        [Header("Field Configuration")] [Range(0f, 1f)]
+        public float updateRate = 0.1f;
+
+        public int width = 256;
         public int height = 256;
         public float massScale = 0;
         public float temperatureScale = 0;
         public float spiralTightness = 1.0f;
         public float precessionOffset = 1.0f;
+        public float siderealOffset = 1.0f;
+        public float extraOffset = 1.0f;
         public float acceleration = 100;
         public float flipFrequency = 10;
         public float speedChangeFrequency = 1;
@@ -20,35 +27,34 @@ namespace ConsequenceCascade.Behaviours
         public float particleSize = 1;
         public int iterations = 1;
         [Range(0.0f, 0.1f)] public float damping = 0.1f;
-        [Header("Simulation Parameters")]
-        public SimulationConfig[] layers;
+        [Header("Simulation Parameters")] public SimulationConfig[] layers;
 
-        public int[] speeds;
-        [Header("Visualization")]  
-        public ComputeShader computeShader;
+        public float[] speeds;
+        [Header("Visualization")] public ComputeShader computeShader;
 
         public Material particleMaterial;
         public Mesh particleMesh;
 
-        [Header("Debug")]
-        public bool pauseSimulation = false;  
-        
+        [Header("Debug")] public bool pauseSimulation = false;
+
         // Internal variables  
         private ComputeBuffer[] fieldBuffers;
-        private ParticleDrawer[] drawers;  
-        
-        private int initializeKernel;  
+        private ParticleDrawer[] drawers;
+
+        private int initializeKernel;
         private int updateKernel;
-        private int threadGroupsX;  
-        private int threadGroupsY;  
+        private int threadGroupsX;
+        private int threadGroupsY;
         private bool initialized = false;
-        
+
         private float nextFlip;
         private float nextSpeedChange;
         private Camera cam;
         private int speedThresholdIndex;
         private int direction = 1;
-        struct FieldCell  
+        private float lastTick;
+
+        struct FieldCell
         {
             public Vector2 position;
             public Vector2 previousPosition;
@@ -57,8 +63,8 @@ namespace ConsequenceCascade.Behaviours
             public float mass;
             public float temperature;
             public float balance;
-        }  
-        
+        }
+
         [System.Serializable]
         public class SimulationConfig
         {
@@ -68,41 +74,80 @@ namespace ConsequenceCascade.Behaviours
             public float siderealSpeed;
             public int iterations;
         }
-        
-        void OnEnable()  
-        {  
-            if (!initialized)  
-            {  
-                InitializeSimulation();  
-                PrepareVisualization();  
-                initialized = true;  
-            }  
-        }  
-        
-        void Start()  
-        {  
+
+        void OnEnable()
+        {
+            if (!initialized)
+            {
+                InitializeSimulation();
+                PrepareVisualization();
+                initialized = true;
+            }
+        }
+
+        void Start()
+        {
+            Application.targetFrameRate = 120;
             cam = Camera.main;
-            if (!initialized)  
-            {  
-                InitializeSimulation();  
-                PrepareVisualization();  
-                initialized = true;  
-            }  
-        }  
-        
-        void Update()  
-        {  
-            if (!initialized) return;  
-            
-            if (!pauseSimulation)  
+            if (!initialized)
+            {
+                InitializeSimulation();
+                PrepareVisualization();
+                initialized = true;
+            }
+        }
+
+        void Update()
+        {
+            if (!initialized) return;
+
+            if (!pauseSimulation)
             {
                 for (int i = 0; i < iterations; i++)
                 {
-                    UpdateSimulation();  
+                    UpdateSimulation();
                 }
-              
-            }  
+            }
+
             UpdateVisualization();
+
+            if (Input.touchSupported)
+            {
+                HandleTouchInput();
+            }
+            else
+            {
+                HandleKeyboardInput();
+            }
+        }
+
+        void HandleTouchInput()
+        {
+            if (Input.touchCount == 5)
+            {
+                ResetAllFields();
+            }
+
+            var touch = Input.GetTouch(0);
+            if (touch.phase == TouchPhase.Moved && Mathf.Abs(touch.deltaPosition.x) > 1
+                                                && cam.ScreenToViewportPoint(touch.position).y < 0.1f)
+            {
+                var x = cam.ScreenToViewportPoint(touch.position).x - 0.5f;
+                var dir = Mathf.Sign(x);
+                x = Mathf.Abs(x);
+                speeds[speedThresholdIndex] = (x * x * x * x * x) * dir * 1e+09f;
+            }
+        }
+
+        void HandleKeyboardInput()
+        {
+            if (Input.GetMouseButton(0))
+            {
+                var x = cam.ScreenToViewportPoint(Input.mousePosition).x - 0.5f;
+                var dir = Mathf.Sign(x);
+                x = Mathf.Abs(x);
+              //  speeds[speedThresholdIndex] = (x * x * x * x * x) * dir * 100000000000;
+            }
 
             if (Input.GetKeyDown(KeyCode.R))
             {
@@ -113,11 +158,10 @@ namespace ConsequenceCascade.Behaviours
             {
                 pauseSimulation = !pauseSimulation;
             }
-            
+
             if (Input.GetKeyDown(KeyCode.Return))
             {
                 direction *= -1;
-                //speedThresholdIndex = speeds.Length - 1;
             }
 
             if (Input.GetKeyDown(KeyCode.W))
@@ -127,6 +171,7 @@ namespace ConsequenceCascade.Behaviours
                     speedThresholdIndex++;
                 }
             }
+
             if (Input.GetKeyDown(KeyCode.S))
             {
                 if (speedThresholdIndex > 0)
@@ -134,130 +179,154 @@ namespace ConsequenceCascade.Behaviours
                     speedThresholdIndex--;
                 }
             }
-        }  
-        
-        void InitializeSimulation()  
+        }
+
+        void InitializeSimulation()
         {
-            if (computeShader == null)  
-            {  
-                Debug.LogError("Compute shader is not assigned!");  
-                return;  
-            }  
-            
-            initializeKernel = computeShader.FindKernel("InitializeField");  
-            updateKernel = computeShader.FindKernel("UpdateField");
-            
-            threadGroupsX = Mathf.CeilToInt(width / 8f);  
-            threadGroupsY = Mathf.CeilToInt(height / 8f);  
-            
-            fieldBuffers = new ComputeBuffer[layers.Length];  
-            
-            for (int i = 0; i < layers.Length; i++)  
+            if (computeShader == null)
             {
-                int stride = System.Runtime.InteropServices.Marshal.SizeOf(typeof(FieldCell));  
-                fieldBuffers[i] = new ComputeBuffer(width * height, stride);  
+                Debug.LogError("Compute shader is not assigned!");
+                return;
+            }
 
-                FieldCell[] initialData = new FieldCell[width * height];  
-                for (int j = 0; j < width * height; j++)  
-                {  
-                    initialData[j] = new FieldCell();  
-                }  
-                fieldBuffers[i].SetData(initialData);  
+            initializeKernel = computeShader.FindKernel("InitializeField");
+            updateKernel = computeShader.FindKernel("UpdateField");
 
-                computeShader.SetInt("width", width);  
-                computeShader.SetInt("height", height);  
+            threadGroupsX = Mathf.CeilToInt(width / 8f);
+            threadGroupsY = Mathf.CeilToInt(height / 8f);
+
+            fieldBuffers = new ComputeBuffer[layers.Length];
+
+            for (int i = 0; i < layers.Length; i++)
+            {
+                int stride = System.Runtime.InteropServices.Marshal.SizeOf(typeof(FieldCell));
+                fieldBuffers[i] = new ComputeBuffer(width * height, stride);
+
+                FieldCell[] initialData = new FieldCell[width * height];
+                for (int j = 0; j < width * height; j++)
+                {
+                    initialData[j] = new FieldCell();
+                }
+
+                fieldBuffers[i].SetData(initialData);
+
+                computeShader.SetInt("width", width);
+                computeShader.SetInt("height", height);
                 computeShader.SetBuffer(initializeKernel, "currentField", fieldBuffers[i]);
-             
-                computeShader.Dispatch(initializeKernel, threadGroupsX, threadGroupsY, 1);  
-            }  
-        }  
-        
-        void PrepareVisualization()  
+
+                computeShader.Dispatch(initializeKernel, threadGroupsX, threadGroupsY, 1);
+            }
+        }
+
+        void PrepareVisualization()
         {
-            drawers = new ParticleDrawer[layers.Length];  
-            
-            for (int i = 0; i < layers.Length; i++)  
+            drawers = new ParticleDrawer[layers.Length];
+
+            for (int i = 0; i < layers.Length; i++)
             {
                 drawers[i] = new ParticleDrawer(particleMaterial, particleMesh, fieldBuffers[i]);
-            }  
-        }  
-        
-        void UpdateSimulation()  
+            }
+        }
+
+        void Tick()
         {
-            for (int i = 0; i < layers.Length; i++)  
+            for (int i = 0; i < layers.Length; i++)
             {
-                SetShaderParameters(i);  
-                
+                SetShaderParameters(i);
+
                 computeShader.SetBuffer(updateKernel, "currentField", fieldBuffers[i]);
                 computeShader.Dispatch(updateKernel, threadGroupsX, threadGroupsY, 1);
-                
-                
             }
+        }
+
+        void UpdateSimulation()
+        {
+            if (freeze)
+            {
+                ResetAllFields();
+                for (int i = 0; i < ticks; i++)
+                {
+                    Tick();
+                }
+                return;
+            }
+            
+            
+            if (Time.time - lastTick < updateRate)
+            {
+                return;
+            }
+
+            ticks++;
+            lastTick = Time.time;
+            precessionOffset += speeds[0] * Time.deltaTime;
+            Tick();
 
             if (Time.time > nextFlip)
             {
                 nextFlip = Time.time + Random.Range(flipFrequency, flipFrequency * 2);
                 layers[0].precessionalSpeed *= -1;
             }
-        }  
-        
-        void UpdateVisualization()  
+        }
+
+        void UpdateVisualization()
         {
-            for (int i = 0; i < layers.Length; i++)  
-            {  
-                drawers[i].SetSize(particleSize * cam.orthographicSize);
+            for (int i = 0; i < layers.Length; i++)
+            {
+                drawers[i].SetSize(particleSize);
                 drawers[i].Draw();
-            }  
-        }  
-        
-        void SetShaderParameters(int layerIndex)  
+            }
+        }
+
+        void SetShaderParameters(int layerIndex)
         {
-            computeShader.SetFloat("baseEccentricity", layers[layerIndex].baseEccentricity);  
-            computeShader.SetFloat("baseSemiMajorAxis", layers[layerIndex].baseSemiMajorAxis / cam.orthographicSize);
+            computeShader.SetFloat("baseEccentricity", layers[layerIndex].baseEccentricity);
+            computeShader.SetFloat("baseSemiMajorAxis", layers[layerIndex].baseSemiMajorAxis);
             computeShader.SetFloat("siderealSpeed", layers[layerIndex].siderealSpeed);
             //layers[layerIndex].precessionalSpeed += Time.deltaTime * acceleration;
             computeShader.SetFloat("precessionalSpeed", speeds[speedThresholdIndex] * direction);
-            computeShader.SetFloat("precessionOffset", precessionOffset);
+            computeShader.SetFloat("precessionalOffset", precessionOffset);
+            computeShader.SetFloat("siderealOffset", siderealOffset);
+            computeShader.SetFloat("extraOffset", extraOffset);
             computeShader.SetFloat("deltaTime", Time.deltaTime);
             computeShader.SetFloat("iterations", layers[layerIndex].iterations);
-            computeShader.SetFloat("density", density * cam.orthographicSize);
+            computeShader.SetFloat("density", density);
             computeShader.SetFloat("damping", damping);
             computeShader.SetFloat("temperatureScale", temperatureScale);
             computeShader.SetFloat("massScale", massScale);
             computeShader.SetFloat("spiralTightness", spiralTightness);
-        }  
-        
-        public void ResetAllFields()  
-        {  
-            
+        }
+
+        public void ResetAllFields()
+        {
             for (int i = 0; i < layers.Length; i++)
             {
                 layers[i].precessionalSpeed = 0;
-                computeShader.SetBuffer(initializeKernel, "currentField", fieldBuffers[i]);  
-                computeShader.Dispatch(initializeKernel, threadGroupsX, threadGroupsY, 1);  
-            }  
-        }  
-      
-        void OnDisable()  
-        {  
-            CleanupBuffers();  
-            initialized = false;  
-        }  
-        
-        void OnDestroy()  
-        {  
-            CleanupBuffers();  
-        }  
-        
-        void CleanupBuffers()  
-        {
-            if (fieldBuffers != null)  
-            {  
-                foreach (var buffer in fieldBuffers)  
-                {  
-                    if (buffer != null) buffer.Release();  
-                }  
+                computeShader.SetBuffer(initializeKernel, "currentField", fieldBuffers[i]);
+                computeShader.Dispatch(initializeKernel, threadGroupsX, threadGroupsY, 1);
             }
-        }  
+        }
+
+        void OnDisable()
+        {
+            CleanupBuffers();
+            initialized = false;
+        }
+
+        void OnDestroy()
+        {
+            CleanupBuffers();
+        }
+
+        void CleanupBuffers()
+        {
+            if (fieldBuffers != null)
+            {
+                foreach (var buffer in fieldBuffers)
+                {
+                    if (buffer != null) buffer.Release();
+                }
+            }
+        }
     }
 }
